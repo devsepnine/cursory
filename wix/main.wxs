@@ -1,0 +1,167 @@
+<?xml version='1.0' encoding='windows-1252'?>
+<!--
+  Cursory installer definition (WiX Toolset v3).
+
+  Customized from the cargo-wix default template for a GUI application:
+    - installs cursory.exe into "Program Files\Cursory"
+    - creates an All-Users Start Menu shortcut so the app is searchable in
+      Windows search (the default CLI template only added the exe to PATH)
+    - shows the product icon in Add/Remove Programs
+    - MajorUpgrade replaces any previously installed version in place
+
+  Do NOT change the UpgradeCode below, or version upgrades will install
+  side-by-side instead of replacing the previous build.
+
+  cargo-wix supplies these preprocessor variables at build time:
+    $(var.Version)            -> package.version from Cargo.toml
+    $(var.CargoTargetBinDir)  -> directory holding the compiled binary
+-->
+
+<?if $(sys.BUILDARCH) = x64 or $(sys.BUILDARCH) = arm64 ?>
+    <?define PlatformProgramFilesFolder = "ProgramFiles64Folder" ?>
+<?else ?>
+    <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
+<?endif ?>
+
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+
+    <Product
+        Id='*'
+        Name='Cursory'
+        UpgradeCode='AA2933B6-DB9D-4CEB-AB6C-40F1BDFDDC86'
+        Manufacturer='HibiCanvas'
+        Language='1033'
+        Codepage='1252'
+        Version='$(var.Version)'>
+
+        <Package Id='*'
+            Keywords='Installer'
+            Description='Confine the mouse cursor to a window, monitor, or custom rectangle'
+            Manufacturer='HibiCanvas'
+            InstallerVersion='450'
+            Languages='1033'
+            Compressed='yes'
+            InstallScope='perMachine'
+            SummaryCodepage='1252'
+            />
+
+        <MajorUpgrade
+            Schedule='afterInstallInitialize'
+            DowngradeErrorMessage='A newer version of [ProductName] is already installed. Setup will now exit.'/>
+
+        <Media Id='1' Cabinet='media1.cab' EmbedCab='yes' DiskPrompt='CD-ROM #1'/>
+        <Property Id='DiskPrompt' Value='Cursory Installation'/>
+
+        <Icon Id='ProductIcon' SourceFile='assets\icon.ico'/>
+        <Property Id='ARPPRODUCTICON' Value='ProductIcon'/>
+
+        <Directory Id='TARGETDIR' Name='SourceDir'>
+            <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
+                <Directory Id='APPLICATIONFOLDER' Name='Cursory'>
+                    <Component Id='CursoryExeComponent'
+                               Guid='8D9960DF-0866-454E-8398-DBBF92FBFB24'>
+                        <File
+                            Id='CursoryExe'
+                            Name='cursory.exe'
+                            DiskId='1'
+                            Source='$(var.CargoTargetBinDir)\cursory.exe'
+                            KeyPath='yes'/>
+                    </Component>
+                </Directory>
+            </Directory>
+
+            <!-- Start Menu shortcut: makes the app searchable in Windows. -->
+            <Directory Id='ProgramMenuFolder'>
+                <Component Id='ApplicationShortcut' Guid='*'>
+                    <Shortcut
+                        Id='StartMenuShortcut'
+                        Name='Cursory'
+                        Description='Confine the mouse cursor to a window, monitor, or custom rectangle'
+                        Target='[#CursoryExe]'
+                        WorkingDirectory='APPLICATIONFOLDER'
+                        Icon='ProductIcon'/>
+                    <!--
+                      KeyPath MUST be HKCU: WiX/ICE treats ProgramMenuFolder as a
+                      per-user profile location, so a non-advertised shortcut there
+                      requires an HKCU keypath (ICE38/ICE43). An HKLM keypath here
+                      fails with ICE57 (per-user data + per-machine keypath). This
+                      is the canonical WiX shortcut pattern and is correct even for
+                      a perMachine package.
+                    -->
+                    <RegistryValue
+                        Root='HKCU'
+                        Key='Software\HibiCanvas\Cursory'
+                        Name='installed'
+                        Type='integer'
+                        Value='1'
+                        KeyPath='yes'/>
+                </Component>
+            </Directory>
+        </Directory>
+
+        <Feature
+            Id='MainFeature'
+            Title='Cursory'
+            Description='Installs Cursory and a Start Menu shortcut.'
+            Level='1'
+            ConfigurableDirectory='APPLICATIONFOLDER'
+            AllowAdvertise='no'
+            Display='expand'
+            Absent='disallow'>
+            <ComponentRef Id='CursoryExeComponent'/>
+            <ComponentRef Id='ApplicationShortcut'/>
+        </Feature>
+
+        <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
+
+        <!--
+          Custom wizard derived from WixUI_Minimal, with the license page removed.
+          Standard WiX UI sets force a LicenseAgreement page that needs a LICENSE
+          RTF; Cursory has no EULA, so we use the plain WelcomeDlg instead of
+          WelcomeEulaDlg. Flow: Welcome -> (install) -> Finish, giving a clear
+          completion screen (the bare progress UI just flashed by with no
+          confirmation). Maintenance/repair/remove paths mirror WixUI_Minimal.
+        -->
+        <UI Id='CursoryUI'>
+            <TextStyle Id='WixUI_Font_Normal' FaceName='Tahoma' Size='8' />
+            <TextStyle Id='WixUI_Font_Bigger' FaceName='Tahoma' Size='12' />
+            <TextStyle Id='WixUI_Font_Title' FaceName='Tahoma' Size='9' Bold='yes' />
+
+            <Property Id='DefaultUIFont' Value='WixUI_Font_Normal' />
+            <Property Id='WixUI_Mode' Value='Minimal' />
+
+            <DialogRef Id='ErrorDlg' />
+            <DialogRef Id='FatalError' />
+            <DialogRef Id='FilesInUse' />
+            <DialogRef Id='MsiRMFilesInUse' />
+            <DialogRef Id='PrepareDlg' />
+            <DialogRef Id='ProgressDlg' />
+            <DialogRef Id='ResumeDlg' />
+            <DialogRef Id='UserExit' />
+            <DialogRef Id='WelcomeDlg' />
+
+            <Publish Dialog='ExitDialog' Control='Finish' Event='EndDialog' Value='Return' Order='999'>1</Publish>
+
+            <!-- Fresh install: Welcome -> begin install directly (no license page). -->
+            <Publish Dialog='WelcomeDlg' Control='Next' Event='EndDialog' Value='Return'>NOT Installed</Publish>
+            <!-- Patch: Welcome -> VerifyReady. -->
+            <Publish Dialog='WelcomeDlg' Control='Next' Event='NewDialog' Value='VerifyReadyDlg'>Installed AND PATCH</Publish>
+
+            <Publish Dialog='VerifyReadyDlg' Control='Back' Event='NewDialog' Value='MaintenanceTypeDlg'>1</Publish>
+            <Publish Dialog='VerifyReadyDlg' Control='Back' Event='NewDialog' Value='WelcomeDlg' Order='2'>Installed AND PATCH</Publish>
+
+            <Publish Dialog='MaintenanceWelcomeDlg' Control='Next' Event='NewDialog' Value='MaintenanceTypeDlg'>1</Publish>
+            <Publish Dialog='MaintenanceTypeDlg' Control='RepairButton' Event='NewDialog' Value='VerifyReadyDlg'>1</Publish>
+            <Publish Dialog='MaintenanceTypeDlg' Control='RemoveButton' Event='NewDialog' Value='VerifyReadyDlg'>1</Publish>
+            <Publish Dialog='MaintenanceTypeDlg' Control='Back' Event='NewDialog' Value='MaintenanceWelcomeDlg'>1</Publish>
+
+            <InstallUISequence>
+                <Show Dialog='WelcomeDlg' Before='ProgressDlg'>NOT Installed</Show>
+            </InstallUISequence>
+        </UI>
+
+        <UIRef Id='WixUI_Common' />
+
+    </Product>
+
+</Wix>
