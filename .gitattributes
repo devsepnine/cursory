@@ -19,3 +19,5 @@
 *.png       binary
 *.bmp       binary
 *.rtf       binary
+*.webp      binary
+*.gif       binary

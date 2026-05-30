@@ -7,8 +7,7 @@
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 
-<!-- TODO: add a demo GIF (window + cursor hitting the invisible wall + release), e.g. assets/demo.gif -->
-<!-- ![Cursory demo](assets/demo.gif) -->
+![Cursory demo](assets/demo.webp)
 
 ## Features
 

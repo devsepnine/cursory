@@ -7,8 +7,7 @@
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 
-<!-- TODO: 데모 GIF 추가 (창 + 커서가 보이지 않는 벽에 막히는 장면 + 해제), 예: assets/demo.gif -->
-<!-- ![Cursory demo](assets/demo.gif) -->
+![Cursory demo](assets/demo.webp)
 
 ## 기능
 
