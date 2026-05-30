@@ -35,9 +35,6 @@ lto = "thin"
 codegen-units = 1
 strip = true
 
-[patch.crates-io]
-iced_wgpu = { path = "vendor/iced_wgpu" }
-
 [package.metadata.wix]
 eula = false
 license = false
