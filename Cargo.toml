@@ -5,6 +5,7 @@ edition = "2024"
 rust-version = "1.85"
 description = "Confine the mouse cursor to a window, monitor, or custom rectangle"
 authors = ["HibiCanvas"]
+license = "MIT"
 
 [dependencies]
 iced = { version = "0.14", default-features = false, features = ["tokio", "advanced", "canvas", "wgpu"] }

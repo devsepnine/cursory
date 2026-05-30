@@ -1,0 +1,21 @@
+# Normalize line endings: store everything as LF in the repo, check out native.
+* text=auto
+
+# Source and config files are always LF in the repo.
+*.rs        text eol=lf
+*.toml      text eol=lf
+*.lock      text eol=lf
+*.wxs       text eol=lf
+*.wgsl      text eol=lf
+*.md        text eol=lf
+*.json      text eol=lf
+*.gitignore text eol=lf
+
+# PowerShell scripts use CRLF on checkout (Windows-native tooling).
+*.ps1       text eol=crlf
+
+# Binary assets must never be normalized.
+*.ico       binary
+*.png       binary
+*.bmp       binary
+*.rtf       binary
