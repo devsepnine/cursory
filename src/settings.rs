@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::app::{CloseBehavior, Mode};
+use crate::domain::{CloseBehavior, Mode};
 
 #[derive(Debug, Clone)]
 pub struct Settings {

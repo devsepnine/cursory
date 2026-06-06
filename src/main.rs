@@ -3,6 +3,7 @@
 mod app;
 mod autostart;
 mod confine;
+mod domain;
 mod hotkey;
 mod icon;
 mod monitor;

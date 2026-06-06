@@ -4,6 +4,7 @@ use iced::{Subscription, Task, Theme, time, window};
 
 use crate::autostart;
 use crate::confine::{CageMode, ClipController, ScreenRect};
+pub use crate::domain::{CloseBehavior, Mode};
 use crate::hotkey::{self, Captured, HotkeyService};
 use crate::icon::{self, IconState};
 use crate::monitor::{self, MonitorInfo};
@@ -21,19 +22,6 @@ mod update;
 mod update_draw;
 mod update_hotkey;
 mod view;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Mode {
-    Window,
-    Monitor,
-    Custom,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CloseBehavior {
-    ToTray,
-    Exit,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Field {
