@@ -14,8 +14,9 @@ use windows::Win32::UI::Shell::{
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CREATESTRUCTW, CreateIconFromResourceEx, CreatePopupMenu, CreateWindowExW,
     DefWindowProcW, DestroyMenu, DestroyWindow, DispatchMessageW, GWLP_USERDATA, GetCursorPos,
-    GetMessageW, GetWindowLongPtrW, HICON, HWND_MESSAGE, IMAGE_FLAGS, MF_SEPARATOR, MF_STRING, MSG,
-    PostMessageW, PostQuitMessage, RegisterClassW, SetForegroundWindow, SetWindowLongPtrW,
+    GetMessageW, GetWindowLongPtrW, HICON, HWND_MESSAGE, IMAGE_FLAGS, MB_ICONINFORMATION, MB_OK,
+    MB_SETFOREGROUND, MF_SEPARATOR, MF_STRING, MSG, MessageBoxW, PostMessageW, PostQuitMessage,
+    RegisterClassW, SetForegroundWindow, SetWindowLongPtrW,
     TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WINDOW_EX_STYLE, WINDOW_STYLE,
     WM_APP, WM_CREATE, WM_DESTROY, WM_LBUTTONDBLCLK, WM_NULL, WM_RBUTTONUP, WNDCLASSW,
 };
@@ -31,7 +32,8 @@ const ACTIVE_ICON: &[u8] = include_bytes!("../assets/icon-active.ico");
 // Context-menu command ids (TrackPopupMenu with TPM_RETURNCMD returns these).
 const CMD_SHOW: u32 = 1;
 const CMD_TOGGLE: u32 = 2;
-const CMD_EXIT: u32 = 3;
+const CMD_ABOUT: u32 = 3;
+const CMD_EXIT: u32 = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrayEvent {
@@ -363,6 +365,7 @@ unsafe fn show_context_menu(hwnd: HWND, ctx: &TrayContext) {
         let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
         let _ = AppendMenuW(menu, MF_STRING, CMD_TOGGLE as usize, toggle_label);
         let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
+        let _ = AppendMenuW(menu, MF_STRING, CMD_ABOUT as usize, w!("About Cursory"));
         let _ = AppendMenuW(menu, MF_STRING, CMD_EXIT as usize, w!("Exit"));
     }
 
@@ -390,9 +393,35 @@ unsafe fn show_context_menu(hwnd: HWND, ctx: &TrayContext) {
         CMD_SHOW => Some(TrayEvent::Restore),
         CMD_TOGGLE => Some(TrayEvent::Toggle),
         CMD_EXIT => Some(TrayEvent::Exit),
+        // "About" is shown directly on the tray thread; the cursor cage runs on
+        // its own thread, so the modal box does not stall confinement.
+        CMD_ABOUT => {
+            unsafe { show_about() };
+            None
+        }
         _ => None,
     };
     if let Some(event) = event {
         let _ = ctx.sender.send(event);
+    }
+}
+
+/// Show a native "About" dialog with the app name, version, and a one-line
+/// description. Built as a runtime wide string since the version is dynamic.
+unsafe fn show_about() {
+    let text = format!(
+        "Cursory {}\n\n\
+         Confine the mouse cursor to a window, monitor, or custom rectangle.\n\n\
+         Double-click the tray icon to restore the window.",
+        env!("CARGO_PKG_VERSION")
+    );
+    let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+    unsafe {
+        MessageBoxW(
+            None,
+            PCWSTR(wide.as_ptr()),
+            w!("About Cursory"),
+            MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND,
+        );
     }
 }
