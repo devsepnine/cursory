@@ -108,8 +108,12 @@ impl App {
             return self.restore_from_tray();
         }
         if let Some(tray) = self.tray.as_ref() {
-            if matches!(tray.poll(), Some(TrayEvent::RestoreRequested)) {
-                return self.restore_from_tray();
+            if let Some(event) = tray.poll() {
+                return match event {
+                    TrayEvent::Restore => self.restore_from_tray(),
+                    TrayEvent::Toggle => self.toggle(),
+                    TrayEvent::Exit => self.exit_app(),
+                };
             }
         }
         if let Some(reason) = self.controller.take_auto_release() {

@@ -1,23 +1,25 @@
+use std::cell::Cell;
 use std::ffi::c_void;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::{self, JoinHandle};
 
 use crate::icon::IconState;
 
-use windows::Win32::Foundation::{BOOL, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Foundation::{BOOL, HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Shell::{
     NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NIM_MODIFY, NOTIFYICONDATAW,
     Shell_NotifyIconW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CREATESTRUCTW, CreateIconFromResourceEx, CreateWindowExW, DefWindowProcW, DestroyWindow,
-    DispatchMessageW, GWLP_USERDATA, GetMessageW, GetWindowLongPtrW, HICON, HWND_MESSAGE,
-    IMAGE_FLAGS, MSG, PostMessageW, PostQuitMessage, RegisterClassW, SetWindowLongPtrW,
-    TranslateMessage, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_CREATE, WM_DESTROY,
-    WM_LBUTTONDBLCLK, WNDCLASSW,
+    AppendMenuW, CREATESTRUCTW, CreateIconFromResourceEx, CreatePopupMenu, CreateWindowExW,
+    DefWindowProcW, DestroyMenu, DestroyWindow, DispatchMessageW, GWLP_USERDATA, GetCursorPos,
+    GetMessageW, GetWindowLongPtrW, HICON, HWND_MESSAGE, IMAGE_FLAGS, MF_SEPARATOR, MF_STRING, MSG,
+    PostMessageW, PostQuitMessage, RegisterClassW, SetForegroundWindow, SetWindowLongPtrW,
+    TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WINDOW_EX_STYLE, WINDOW_STYLE,
+    WM_APP, WM_CREATE, WM_DESTROY, WM_LBUTTONDBLCLK, WM_NULL, WM_RBUTTONUP, WNDCLASSW,
 };
-use windows::core::{Error, w};
+use windows::core::{Error, PCWSTR, w};
 
 const TRAY_UID: u32 = 1;
 const WM_TRAY_ICON: u32 = WM_APP + 1;
@@ -26,9 +28,26 @@ const WM_TRAY_SET_ACTIVE: u32 = WM_APP + 3;
 const IDLE_ICON: &[u8] = include_bytes!("../assets/icon.ico");
 const ACTIVE_ICON: &[u8] = include_bytes!("../assets/icon-active.ico");
 
+// Context-menu command ids (TrackPopupMenu with TPM_RETURNCMD returns these).
+const CMD_SHOW: u32 = 1;
+const CMD_TOGGLE: u32 = 2;
+const CMD_EXIT: u32 = 3;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrayEvent {
-    RestoreRequested,
+    Restore,
+    Toggle,
+    Exit,
+}
+
+/// Per-window context handed to the tray window via its creation lparam and
+/// read back from GWLP_USERDATA. It lives on `run_tray_window`'s stack for the
+/// whole message loop and is only touched on the tray thread, so the interior
+/// `Cell` needs no synchronization. `active` mirrors the cage state so the
+/// context menu can show the right Activate/Release label.
+struct TrayContext {
+    sender: Sender<TrayEvent>,
+    active: Cell<bool>,
 }
 
 pub struct TrayService {
@@ -92,13 +111,17 @@ fn run_tray_window(
     event_tx: Sender<TrayEvent>,
     hwnd_tx: Sender<Option<isize>>,
 ) -> windows::core::Result<()> {
-    // `event_tx` lives on this stack frame for the whole message loop. The
-    // window proc reaches it through a borrowed pointer stashed in
-    // GWLP_USERDATA (set from the CreateWindowExW lparam), so there is no shared
-    // global and no ownership handed to the window. Both run on this thread, so
-    // the borrow is single-threaded; the pointer is only ever read while this
-    // frame — and thus `event_tx` — is alive.
-    let hwnd = match unsafe { create_message_window(&event_tx) } {
+    // `ctx` lives on this stack frame for the whole message loop. The window
+    // proc reaches it through a borrowed pointer stashed in GWLP_USERDATA (set
+    // from the CreateWindowExW lparam), so there is no shared global and no
+    // ownership handed to the window. Everything runs on this thread, so the
+    // borrow is single-threaded; the pointer is only ever read while this frame
+    // — and thus `ctx` — is alive.
+    let ctx = TrayContext {
+        sender: event_tx,
+        active: Cell::new(false),
+    };
+    let hwnd = match unsafe { create_message_window(&ctx) } {
         Ok(hwnd) => hwnd,
         Err(error) => {
             let _ = hwnd_tx.send(None);
@@ -127,7 +150,7 @@ fn run_tray_window(
     Ok(())
 }
 
-unsafe fn create_message_window(event_tx: &Sender<TrayEvent>) -> windows::core::Result<HWND> {
+unsafe fn create_message_window(ctx: &TrayContext) -> windows::core::Result<HWND> {
     let instance = unsafe { GetModuleHandleW(None)? };
     let class_name = w!("CursoryTrayWindow");
 
@@ -154,7 +177,7 @@ unsafe fn create_message_window(event_tx: &Sender<TrayEvent>) -> windows::core::
             HWND_MESSAGE,
             None,
             instance,
-            Some(event_tx as *const Sender<TrayEvent> as *const c_void),
+            Some(ctx as *const TrayContext as *const c_void),
         )
     }
 }
@@ -265,19 +288,24 @@ unsafe extern "system" fn tray_wnd_proc(
 ) -> LRESULT {
     match msg {
         WM_CREATE => {
-            // Stash the borrowed Sender pointer (passed as the CreateWindowExW
-            // lparam) so later messages can reach it without a global.
+            // Stash the borrowed TrayContext pointer (passed as the
+            // CreateWindowExW lparam) so later messages can reach it.
             let create = lparam.0 as *const CREATESTRUCTW;
-            let sender = unsafe { (*create).lpCreateParams };
+            let context = unsafe { (*create).lpCreateParams };
             unsafe {
-                SetWindowLongPtrW(hwnd, GWLP_USERDATA, sender as isize);
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, context as isize);
             }
             LRESULT(0)
         }
-        WM_TRAY_ICON if lparam.0 as u32 == WM_LBUTTONDBLCLK => {
-            let sender = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) } as *const Sender<TrayEvent>;
-            if !sender.is_null() {
-                let _ = unsafe { (*sender).send(TrayEvent::RestoreRequested) };
+        WM_TRAY_ICON => {
+            if let Some(ctx) = unsafe { tray_context(hwnd) } {
+                match lparam.0 as u32 {
+                    WM_LBUTTONDBLCLK => {
+                        let _ = ctx.sender.send(TrayEvent::Restore);
+                    }
+                    WM_RBUTTONUP => unsafe { show_context_menu(hwnd, ctx) },
+                    _ => {}
+                }
             }
             LRESULT(0)
         }
@@ -289,10 +317,14 @@ unsafe extern "system" fn tray_wnd_proc(
             LRESULT(0)
         }
         WM_TRAY_SET_ACTIVE => {
-            let state = if wparam.0 == 0 {
-                IconState::Idle
-            } else {
+            let active = wparam.0 != 0;
+            if let Some(ctx) = unsafe { tray_context(hwnd) } {
+                ctx.active.set(active);
+            }
+            let state = if active {
                 IconState::Active
+            } else {
+                IconState::Idle
             };
             let _ = update_icon(hwnd, state);
             LRESULT(0)
@@ -304,5 +336,63 @@ unsafe extern "system" fn tray_wnd_proc(
             LRESULT(0)
         }
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+    }
+}
+
+/// Recover the borrowed `TrayContext` stashed in GWLP_USERDATA on WM_CREATE.
+unsafe fn tray_context<'a>(hwnd: HWND) -> Option<&'a TrayContext> {
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) } as *const TrayContext;
+    unsafe { ptr.as_ref() }
+}
+
+/// Build and track the right-click context menu, then forward the chosen
+/// command as a `TrayEvent`. Runs on the tray thread inside the WM_RBUTTONUP
+/// handler.
+unsafe fn show_context_menu(hwnd: HWND, ctx: &TrayContext) {
+    let menu = match unsafe { CreatePopupMenu() } {
+        Ok(menu) => menu,
+        Err(_) => return,
+    };
+    let toggle_label = if ctx.active.get() {
+        w!("Release confine")
+    } else {
+        w!("Activate confine")
+    };
+    unsafe {
+        let _ = AppendMenuW(menu, MF_STRING, CMD_SHOW as usize, w!("Show Cursory"));
+        let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
+        let _ = AppendMenuW(menu, MF_STRING, CMD_TOGGLE as usize, toggle_label);
+        let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
+        let _ = AppendMenuW(menu, MF_STRING, CMD_EXIT as usize, w!("Exit"));
+    }
+
+    let mut point = POINT::default();
+    let command = unsafe {
+        let _ = GetCursorPos(&mut point);
+        // The owner must be foreground or the menu won't dismiss on an outside
+        // click; the trailing WM_NULL post is the documented workaround.
+        let _ = SetForegroundWindow(hwnd);
+        let command = TrackPopupMenu(
+            menu,
+            TPM_RIGHTBUTTON | TPM_RETURNCMD,
+            point.x,
+            point.y,
+            0,
+            hwnd,
+            None,
+        );
+        let _ = PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0));
+        let _ = DestroyMenu(menu);
+        command
+    };
+
+    let event = match command.0 as u32 {
+        CMD_SHOW => Some(TrayEvent::Restore),
+        CMD_TOGGLE => Some(TrayEvent::Toggle),
+        CMD_EXIT => Some(TrayEvent::Exit),
+        _ => None,
+    };
+    if let Some(event) = event {
+        let _ = ctx.sender.send(event);
     }
 }

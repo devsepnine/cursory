@@ -232,13 +232,17 @@ impl App {
     pub(super) fn close_app(&mut self) -> Task<Message> {
         match self.close_behavior {
             CloseBehavior::ToTray => self.hide_to_tray(),
-            CloseBehavior::Exit => {
-                if let Some(id) = self.window_id {
-                    window::close::<Message>(id)
-                } else {
-                    Task::none()
-                }
-            }
+            CloseBehavior::Exit => self.exit_app(),
+        }
+    }
+
+    /// Quit the app unconditionally (the tray "Exit" command). Closing the main
+    /// window ends the iced runtime regardless of `close_behavior`.
+    pub(super) fn exit_app(&mut self) -> Task<Message> {
+        if let Some(id) = self.window_id {
+            window::close::<Message>(id)
+        } else {
+            Task::none()
         }
     }
 
