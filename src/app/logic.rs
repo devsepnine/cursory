@@ -72,6 +72,7 @@ impl App {
             custom_height: self.custom_height.trim().parse().unwrap_or(600),
             padding: self.padding.trim().parse().unwrap_or(0),
             minimize_on_activate: self.minimize_on_activate,
+            start_in_tray: self.start_in_tray,
             close_behavior: self.close_behavior,
             hotkey: self.hotkey.as_ref().and_then(|h| h.serialize()),
         };
@@ -95,6 +96,7 @@ impl App {
         self.custom_height = d.custom_height.to_string();
         self.padding = d.padding.to_string();
         self.minimize_on_activate = d.minimize_on_activate;
+        self.start_in_tray = d.start_in_tray;
         self.close_behavior = d.close_behavior;
         if let Some(svc) = self.hotkey.as_mut() {
             let _ = svc.reset_default();

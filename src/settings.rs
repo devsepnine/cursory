@@ -13,6 +13,7 @@ pub struct Settings {
     pub custom_height: i32,
     pub padding: i32,
     pub minimize_on_activate: bool,
+    pub start_in_tray: bool,
     pub close_behavior: CloseBehavior,
     pub hotkey: Option<String>,
 }
@@ -28,6 +29,7 @@ impl Default for Settings {
             custom_height: 600,
             padding: 4,
             minimize_on_activate: true,
+            start_in_tray: false,
             close_behavior: CloseBehavior::ToTray,
             hotkey: None,
         }
@@ -88,6 +90,9 @@ pub fn load() -> Settings {
             "minimize_on_activate" => {
                 s.minimize_on_activate = value.eq_ignore_ascii_case("true");
             }
+            "start_in_tray" => {
+                s.start_in_tray = value.eq_ignore_ascii_case("true");
+            }
             "close_behavior" => match value {
                 "ToTray" => s.close_behavior = CloseBehavior::ToTray,
                 "Exit" => s.close_behavior = CloseBehavior::Exit,
@@ -125,6 +130,7 @@ pub fn save(s: &Settings) -> Result<(), String> {
          custom_height={}\n\
          padding={}\n\
          minimize_on_activate={}\n\
+         start_in_tray={}\n\
          close_behavior={close}\n\
          hotkey={hotkey}\n",
         s.selected_monitor,
@@ -134,6 +140,7 @@ pub fn save(s: &Settings) -> Result<(), String> {
         s.custom_height,
         s.padding,
         s.minimize_on_activate,
+        s.start_in_tray,
     );
     fs::write(&path, body).map_err(|e| format!("cannot write settings: {e}"))
 }

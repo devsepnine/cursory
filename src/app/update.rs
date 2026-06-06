@@ -18,6 +18,7 @@ impl App {
             Message::HwndCaptured(hwnd) => self.on_hwnd_captured(hwnd),
             Message::MinimizeOnActivateToggled(v) => self.on_minimize_on_activate_toggled(v),
             Message::LaunchOnStartupToggled(v) => self.on_launch_on_startup_toggled(v),
+            Message::StartInTrayToggled(v) => self.on_start_in_tray_toggled(v),
             Message::CloseBehaviorSelected(behavior) => self.on_close_behavior_selected(behavior),
             Message::StartHotkeyRecord => self.on_start_hotkey_record(),
             Message::CancelHotkeyRecord => self.on_cancel_hotkey_record(),
@@ -158,10 +159,16 @@ impl App {
         self.window_id = Some(id);
         let hwnd_task =
             window::raw_id::<Message>(id).map(|raw| Message::HwndCaptured(Some(raw as isize)));
+        let mut tasks = vec![hwnd_task];
         if let Some(icon) = icon::window_icon(IconState::Idle) {
-            return Task::batch([hwnd_task, window::set_icon::<Message>(id, icon)]);
+            tasks.push(window::set_icon::<Message>(id, icon));
         }
-        hwnd_task
+        // Honor the "start in tray" option only on the initial launch. This event
+        // fires once when the window first opens, so the hide never recurs.
+        if self.start_in_tray {
+            tasks.push(self.hide_to_tray());
+        }
+        Task::batch(tasks)
     }
 
     fn on_hwnd_captured(&mut self, hwnd: Option<isize>) -> Task<Message> {
@@ -194,6 +201,12 @@ impl App {
                 self.status = format!("startup setting failed: {e}");
             }
         }
+        Task::none()
+    }
+
+    fn on_start_in_tray_toggled(&mut self, v: bool) -> Task<Message> {
+        self.start_in_tray = v;
+        self.persist();
         Task::none()
     }
 

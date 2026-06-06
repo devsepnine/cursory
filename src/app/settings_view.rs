@@ -21,10 +21,17 @@ impl App {
             .size(15)
             .text_size(13);
 
+        let start_in_tray = checkbox(self.start_in_tray)
+            .label("Start hidden in tray")
+            .on_toggle(Message::StartInTrayToggled)
+            .size(15)
+            .text_size(13);
+
         column![
             self.padding_row(),
             mini,
             startup,
+            start_in_tray,
             self.close_behavior_section(),
             self.hotkey_row(),
             self.reset_row(),
