@@ -249,7 +249,7 @@ impl App {
             return window::gain_focus::<Message>(id);
         }
         let settings = window::Settings {
-            size: iced::Size::new(320.0, 240.0),
+            size: iced::Size::new(320.0, 320.0),
             position: window::Position::Centered,
             resizable: false,
             decorations: false,
