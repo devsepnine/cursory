@@ -14,7 +14,7 @@ impl App {
     fn deactivate(&mut self) -> Task<Message> {
         self.is_active = false;
         self.controller.deactivate();
-        self.status = "released".into();
+        self.set_status("released");
         self.set_tray_active(false);
         if self.minimize_on_activate {
             if let Some(id) = self.window_id {
@@ -31,22 +31,22 @@ impl App {
         let (mode, padding) = match (self.build_cage_mode(), self.parse_padding()) {
             (Ok(m), Ok(p)) => (m, p),
             (Err(e), _) | (_, Err(e)) => {
-                self.status = format!("cannot activate: {e}");
+                self.set_status(format!("cannot activate: {e}"));
                 return Task::none();
             }
         };
         if let Err(e) = self.controller.activate(mode, padding) {
-            self.status = format!("activate error: {e}");
+            self.set_status(format!("activate error: {e}"));
             return Task::none();
         }
         self.is_active = true;
         self.set_tray_active(true);
-        self.status = match mode {
-            CageMode::Window { .. } => "active — app window".into(),
+        self.set_status(match mode {
+            CageMode::Window { .. } => "active — app window".to_string(),
             CageMode::Fixed(r) => {
                 format!("active — {}×{} at ({},{})", r.width(), r.height(), r.left, r.top)
             }
-        };
+        });
         let target_is_self = matches!(
             mode,
             CageMode::Window { hwnd } if Some(hwnd) == self.window_hwnd
@@ -77,7 +77,7 @@ impl App {
             hotkey: self.hotkey.as_ref().and_then(|h| h.serialize()),
         };
         if let Err(e) = settings::save(&settings) {
-            self.status = e;
+            self.set_status(e);
         }
         self.reset_pending = false;
     }
@@ -117,7 +117,7 @@ impl App {
         if self.selected_monitor >= self.monitors.len() {
             self.selected_monitor = 0;
         }
-        self.status = format!("display changed ({} monitor(s))", self.monitors.len());
+        self.set_status(format!("display changed ({} monitor(s))", self.monitors.len()));
         // `refresh_controller_mode` self-guards on `is_active` and rebuilds from
         // the current mode, so it is safe (and a no-op for unaffected modes) to
         // call unconditionally — the caller need not know which mode cares.
@@ -131,14 +131,14 @@ impl App {
         match self.build_cage_mode() {
             Ok(mode) => {
                 if let Err(e) = self.controller.set_mode(mode) {
-                    self.status = format!("update error: {e}");
+                    self.set_status(format!("update error: {e}"));
                 }
             }
             Err(e) => {
                 self.is_active = false;
                 self.controller.deactivate();
                 self.set_tray_active(false);
-                self.status = format!("auto-released: {e}");
+                self.set_status(format!("auto-released: {e}"));
             }
         }
     }
@@ -150,11 +150,11 @@ impl App {
         match self.parse_padding() {
             Ok(p) => {
                 if let Err(e) = self.controller.set_padding(p) {
-                    self.status = format!("padding error: {e}");
+                    self.set_status(format!("padding error: {e}"));
                 }
             }
             Err(e) => {
-                self.status = format!("padding: {e}");
+                self.set_status(format!("padding: {e}"));
             }
         }
     }
@@ -224,7 +224,7 @@ impl App {
     pub(super) fn hide_to_tray(&mut self) -> Task<Message> {
         self.checking_minimized = false;
         if self.tray.is_none() {
-            self.status = "tray unavailable — minimized".into();
+            self.set_status("tray unavailable — minimized");
             if let Some(id) = self.window_id {
                 return window::minimize::<Message>(id, true);
             }
@@ -232,7 +232,7 @@ impl App {
         }
 
         self.hidden_to_tray = true;
-        self.status = "hidden to tray — double-click tray icon to restore".into();
+        self.set_status("hidden to tray — double-click tray icon to restore");
         if let Some(id) = self.window_id {
             return Task::batch([
                 window::minimize::<Message>(id, false),
@@ -244,7 +244,7 @@ impl App {
 
     pub(super) fn restore_from_tray(&mut self) -> Task<Message> {
         self.hidden_to_tray = false;
-        self.status = "restored".into();
+        self.set_status("restored");
         if let Some(id) = self.window_id {
             return Task::batch([
                 window::set_mode::<Message>(id, window::Mode::Windowed),
@@ -266,6 +266,12 @@ impl App {
                 }
             }
         }
+    }
+
+    /// Single entry point for status-line writes. Routing every update through
+    /// one method keeps mutation of the shared `status` field in one place.
+    pub(super) fn set_status(&mut self, message: impl Into<String>) {
+        self.status = message.into();
     }
 
     pub(super) fn set_tray_active(&self, active: bool) {

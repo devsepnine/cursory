@@ -96,14 +96,14 @@ impl App {
         if self.selected_monitor >= self.monitors.len() {
             self.selected_monitor = 0;
         }
-        self.status = format!("monitors refreshed ({} found)", self.monitors.len());
+        self.set_status(format!("monitors refreshed ({} found)", self.monitors.len()));
         self.refresh_controller_mode();
         Task::none()
     }
 
     fn on_refresh_windows(&mut self) -> Task<Message> {
         self.external_windows = target::enumerate();
-        self.status = format!("windows refreshed ({} found)", self.external_windows.len());
+        self.set_status(format!("windows refreshed ({} found)", self.external_windows.len()));
         self.refresh_controller_mode();
         Task::none()
     }
@@ -120,7 +120,7 @@ impl App {
         }
         if let Some(reason) = self.controller.take_auto_release() {
             self.is_active = false;
-            self.status = format!("auto-released: {reason}");
+            self.set_status(format!("auto-released: {reason}"));
             self.set_tray_active(false);
             if let Some(id) = self.window_id {
                 return Task::batch([
@@ -166,7 +166,7 @@ impl App {
     fn on_hwnd_captured(&mut self, hwnd: Option<isize>) -> Task<Message> {
         self.window_hwnd = hwnd;
         if hwnd.is_none() {
-            self.status = "HWND capture failed".into();
+            self.set_status("HWND capture failed");
         } else {
             self.refresh_controller_mode();
         }
@@ -183,14 +183,14 @@ impl App {
         match autostart::set_enabled(v) {
             Ok(state) => {
                 self.launch_on_startup = state;
-                self.status = if state {
-                    "launch on startup enabled".into()
+                self.set_status(if state {
+                    "launch on startup enabled"
                 } else {
-                    "launch on startup disabled".into()
-                };
+                    "launch on startup disabled"
+                });
             }
             Err(e) => {
-                self.status = format!("startup setting failed: {e}");
+                self.set_status(format!("startup setting failed: {e}"));
             }
         }
         Task::none()
@@ -217,7 +217,7 @@ impl App {
 
     fn on_close_requested(&mut self, id: window::Id) -> Task<Message> {
         if Some(id) == self.rect_window_id {
-            self.status = "draw cancelled".into();
+            self.set_status("draw cancelled");
             return self.exit_draw_mode();
         }
         if Some(id) == self.window_id {
@@ -237,14 +237,14 @@ impl App {
     fn on_reset_settings(&mut self) -> Task<Message> {
         if self.reset_pending {
             self.apply_defaults();
-            self.status = "settings reset to defaults".into();
+            self.set_status("settings reset to defaults");
             self.persist();
             if self.is_active {
                 self.refresh_controller_mode();
             }
         } else {
             self.reset_pending = true;
-            self.status = "click Reset again to confirm".into();
+            self.set_status("click Reset again to confirm");
         }
         Task::none()
     }

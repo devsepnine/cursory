@@ -13,7 +13,7 @@ impl App {
         if self.hotkey.is_some() {
             self.recording_hotkey = true;
             self.clear_pending_hotkey();
-            self.status = "press combo, then Confirm (esc to cancel)".into();
+            self.set_status("press combo, then Confirm (esc to cancel)");
         }
         Task::none()
     }
@@ -21,7 +21,7 @@ impl App {
     pub(super) fn on_cancel_hotkey_record(&mut self) -> Task<Message> {
         self.recording_hotkey = false;
         self.clear_pending_hotkey();
-        self.status = "hotkey unchanged".into();
+        self.set_status("hotkey unchanged");
         Task::none()
     }
 
@@ -37,13 +37,13 @@ impl App {
                 let desc = svc.describe().to_string();
                 self.recording_hotkey = false;
                 self.clear_pending_hotkey();
-                self.status = format!("hotkey set to {desc}");
+                self.set_status(format!("hotkey set to {desc}"));
                 self.persist();
             }
             Err(e) => {
                 // keep recording mode open so the user can try another combo
                 self.clear_pending_hotkey();
-                self.status = format!("{e} — try another combo");
+                self.set_status(format!("{e} — try another combo"));
             }
         }
         Task::none()
@@ -57,19 +57,19 @@ impl App {
         if hotkey::is_cancel_key(physical) {
             self.recording_hotkey = false;
             self.clear_pending_hotkey();
-            self.status = "hotkey unchanged".into();
+            self.set_status("hotkey unchanged");
             return Task::none();
         }
         self.pending_hotkey_mods = modifiers;
         if let Some(captured) = hotkey::from_iced(physical, modifiers) {
             self.pending_hotkey = Some(captured);
-            self.status = format!("preview: {} — click Confirm", hotkey::describe_captured(captured));
+            self.set_status(format!("preview: {} — click Confirm", hotkey::describe_captured(captured)));
         } else {
             let mods_str = hotkey::describe_modifiers(modifiers);
             if mods_str.is_empty() {
-                self.status = "press combo, then Confirm".into();
+                self.set_status("press combo, then Confirm");
             } else {
-                self.status = format!("preview: {mods_str}+_  press a key");
+                self.set_status(format!("preview: {mods_str}+_  press a key"));
             }
         }
         Task::none()

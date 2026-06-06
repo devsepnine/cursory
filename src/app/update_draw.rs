@@ -36,7 +36,7 @@ impl App {
     }
 
     pub(super) fn on_cancel_rect(&mut self) -> Task<Message> {
-        self.status = "draw cancelled".into();
+        self.set_status("draw cancelled");
         self.exit_draw_mode()
     }
 
@@ -68,11 +68,11 @@ impl App {
             self.custom_top = top.to_string();
             self.custom_width = w.to_string();
             self.custom_height = h.to_string();
-            self.status = format!("rect set: {}×{} at ({},{})", w, h, left, top);
+            self.set_status(format!("rect set: {}×{} at ({},{})", w, h, left, top));
             self.refresh_controller_mode();
             self.persist();
         } else {
-            self.status = "failed to read rect window position".into();
+            self.set_status("failed to read rect window position");
         }
         self.exit_draw_mode()
     }
