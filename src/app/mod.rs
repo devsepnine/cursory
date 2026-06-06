@@ -8,6 +8,7 @@ pub use crate::domain::{CloseBehavior, Mode};
 use crate::hotkey::{self, HotkeyService};
 use draw_session::DrawSession;
 use hotkey_recorder::HotkeyRecorder;
+use tray_state::TrayState;
 use crate::icon::{self, IconState};
 use crate::monitor::{self, MonitorInfo};
 use crate::settings::{self, Settings};
@@ -22,6 +23,7 @@ mod logic;
 mod panels;
 mod settings_view;
 mod style;
+mod tray_state;
 mod update;
 mod update_draw;
 mod update_hotkey;
@@ -69,8 +71,7 @@ pub struct App {
     recorder: HotkeyRecorder,
     reset_pending: bool,
     draw: DrawSession,
-    hidden_to_tray: bool,
-    checking_minimized: bool,
+    tray_state: TrayState,
     hotkey: Option<HotkeyService>,
     tray: Option<TrayService>,
     controller: ClipController,
@@ -154,8 +155,7 @@ impl Default for App {
             recorder: HotkeyRecorder::default(),
             reset_pending: false,
             draw: DrawSession::default(),
-            hidden_to_tray: false,
-            checking_minimized: false,
+            tray_state: TrayState::default(),
             hotkey,
             tray,
             controller: ClipController::new(),

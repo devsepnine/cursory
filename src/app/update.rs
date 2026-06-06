@@ -138,9 +138,9 @@ impl App {
                 return self.toggle();
             }
         }
-        if !self.hidden_to_tray && !self.checking_minimized {
+        if self.tray_state.should_probe_minimized() {
             if let Some(id) = self.window_id {
-                self.checking_minimized = true;
+                self.tray_state.begin_minimize_probe();
                 return window::is_minimized(id).map(Message::MinimizeStateChecked);
             }
         }
@@ -227,7 +227,7 @@ impl App {
     }
 
     fn on_minimize_state_checked(&mut self, is_minimized: Option<bool>) -> Task<Message> {
-        self.checking_minimized = false;
+        self.tray_state.end_minimize_probe();
         if matches!(is_minimized, Some(true)) {
             return self.hide_to_tray();
         }

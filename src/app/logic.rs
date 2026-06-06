@@ -221,7 +221,7 @@ impl App {
     }
 
     pub(super) fn hide_to_tray(&mut self) -> Task<Message> {
-        self.checking_minimized = false;
+        self.tray_state.end_minimize_probe();
         if self.tray.is_none() {
             self.set_status("tray unavailable — minimized");
             if let Some(id) = self.window_id {
@@ -230,7 +230,7 @@ impl App {
             return Task::none();
         }
 
-        self.hidden_to_tray = true;
+        self.tray_state.mark_hidden();
         self.set_status("hidden to tray — double-click tray icon to restore");
         if let Some(id) = self.window_id {
             return Task::batch([
@@ -242,7 +242,7 @@ impl App {
     }
 
     pub(super) fn restore_from_tray(&mut self) -> Task<Message> {
-        self.hidden_to_tray = false;
+        self.tray_state.mark_restored();
         self.set_status("restored");
         if let Some(id) = self.window_id {
             return Task::batch([
