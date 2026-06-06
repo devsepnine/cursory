@@ -53,9 +53,7 @@ impl App {
     fn on_monitor_selected(&mut self, i: usize) -> Task<Message> {
         if i < self.monitors.len() {
             self.selected_monitor = i;
-            if matches!(self.mode, Mode::Monitor) {
-                self.refresh_controller_mode();
-            }
+            self.refresh_controller_mode();
             self.persist();
         }
         Task::none()
@@ -63,9 +61,7 @@ impl App {
 
     fn on_window_target_selected(&mut self, choice: WindowChoice) -> Task<Message> {
         self.selected_window_hwnd = Some(choice.hwnd);
-        if matches!(self.mode, Mode::Window) {
-            self.refresh_controller_mode();
-        }
+        self.refresh_controller_mode();
         Task::none()
     }
 
@@ -86,7 +82,7 @@ impl App {
         *target = value;
         if matches!(field, Field::Padding) {
             self.refresh_padding();
-        } else if matches!(self.mode, Mode::Custom) {
+        } else {
             self.refresh_controller_mode();
         }
         if valid {
@@ -101,18 +97,14 @@ impl App {
             self.selected_monitor = 0;
         }
         self.status = format!("monitors refreshed ({} found)", self.monitors.len());
-        if matches!(self.mode, Mode::Monitor) {
-            self.refresh_controller_mode();
-        }
+        self.refresh_controller_mode();
         Task::none()
     }
 
     fn on_refresh_windows(&mut self) -> Task<Message> {
         self.external_windows = target::enumerate();
         self.status = format!("windows refreshed ({} found)", self.external_windows.len());
-        if matches!(self.mode, Mode::Window) {
-            self.refresh_controller_mode();
-        }
+        self.refresh_controller_mode();
         Task::none()
     }
 
@@ -175,7 +167,7 @@ impl App {
         self.window_hwnd = hwnd;
         if hwnd.is_none() {
             self.status = "HWND capture failed".into();
-        } else if matches!(self.mode, Mode::Window) {
+        } else {
             self.refresh_controller_mode();
         }
         Task::none()

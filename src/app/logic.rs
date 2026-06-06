@@ -118,9 +118,10 @@ impl App {
             self.selected_monitor = 0;
         }
         self.status = format!("display changed ({} monitor(s))", self.monitors.len());
-        if matches!(self.mode, Mode::Monitor) {
-            self.refresh_controller_mode();
-        }
+        // `refresh_controller_mode` self-guards on `is_active` and rebuilds from
+        // the current mode, so it is safe (and a no-op for unaffected modes) to
+        // call unconditionally — the caller need not know which mode cares.
+        self.refresh_controller_mode();
     }
 
     pub(super) fn refresh_controller_mode(&mut self) {

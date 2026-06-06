@@ -69,9 +69,7 @@ impl App {
             self.custom_width = w.to_string();
             self.custom_height = h.to_string();
             self.status = format!("rect set: {}×{} at ({},{})", w, h, left, top);
-            if matches!(self.mode, Mode::Custom) {
-                self.refresh_controller_mode();
-            }
+            self.refresh_controller_mode();
             self.persist();
         } else {
             self.status = "failed to read rect window position".into();
