@@ -59,11 +59,11 @@ impl App {
 
     fn hotkey_row(&self) -> Element<'_, Message> {
         let label_text = self.hotkey_label();
-        let action: Element<'_, Message> = if self.recording_hotkey {
+        let action: Element<'_, Message> = if self.recorder.is_recording() {
             let mut confirm_btn = button(text("Confirm").size(11))
                 .padding([4, 10])
                 .style(confirm_button_style);
-            if self.pending_hotkey.is_some() {
+            if self.recorder.pending().is_some() {
                 confirm_btn = confirm_btn.on_press(Message::ConfirmHotkeyRecord);
             }
             let cancel_btn = button(text("Cancel").size(11))
@@ -91,11 +91,11 @@ impl App {
     }
 
     fn hotkey_label(&self) -> String {
-        if self.recording_hotkey {
-            if let Some(captured) = self.pending_hotkey {
+        if self.recorder.is_recording() {
+            if let Some(captured) = self.recorder.pending() {
                 return format!("Preview  {}", hotkey::describe_captured(captured));
             }
-            let mods_str = hotkey::describe_modifiers(self.pending_hotkey_mods);
+            let mods_str = hotkey::describe_modifiers(self.recorder.pending_mods());
             return if mods_str.is_empty() {
                 "Recording  press a combo...".to_string()
             } else {

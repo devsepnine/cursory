@@ -132,7 +132,7 @@ impl App {
             return self.window_icon_task(IconState::Idle);
         }
         if let Some(svc) = self.hotkey.as_ref() {
-            if self.recording_hotkey {
+            if self.recorder.is_recording() {
                 svc.drain();
             } else if svc.poll_toggle() {
                 return self.toggle();

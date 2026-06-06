@@ -3,30 +3,22 @@
 use super::*;
 
 impl App {
-    /// Clears the in-progress hotkey preview (combo + tracked modifiers).
-    fn clear_pending_hotkey(&mut self) {
-        self.pending_hotkey = None;
-        self.pending_hotkey_mods = iced::keyboard::Modifiers::empty();
-    }
-
     pub(super) fn on_start_hotkey_record(&mut self) -> Task<Message> {
         if self.hotkey.is_some() {
-            self.recording_hotkey = true;
-            self.clear_pending_hotkey();
+            self.recorder.start();
             self.set_status("press combo, then Confirm (esc to cancel)");
         }
         Task::none()
     }
 
     pub(super) fn on_cancel_hotkey_record(&mut self) -> Task<Message> {
-        self.recording_hotkey = false;
-        self.clear_pending_hotkey();
+        self.recorder.stop();
         self.set_status("hotkey unchanged");
         Task::none()
     }
 
     pub(super) fn on_confirm_hotkey_record(&mut self) -> Task<Message> {
-        let Some(captured) = self.pending_hotkey else {
+        let Some(captured) = self.recorder.pending() else {
             return Task::none();
         };
         let Some(svc) = self.hotkey.as_mut() else {
@@ -35,14 +27,13 @@ impl App {
         match svc.rebind(captured.0, captured.1) {
             Ok(()) => {
                 let desc = svc.describe().to_string();
-                self.recording_hotkey = false;
-                self.clear_pending_hotkey();
+                self.recorder.stop();
                 self.set_status(format!("hotkey set to {desc}"));
                 self.persist();
             }
             Err(e) => {
                 // keep recording mode open so the user can try another combo
-                self.clear_pending_hotkey();
+                self.recorder.clear();
                 self.set_status(format!("{e} — try another combo"));
             }
         }
@@ -55,14 +46,13 @@ impl App {
         modifiers: iced::keyboard::Modifiers,
     ) -> Task<Message> {
         if hotkey::is_cancel_key(physical) {
-            self.recording_hotkey = false;
-            self.clear_pending_hotkey();
+            self.recorder.stop();
             self.set_status("hotkey unchanged");
             return Task::none();
         }
-        self.pending_hotkey_mods = modifiers;
+        self.recorder.set_modifiers(modifiers);
         if let Some(captured) = hotkey::from_iced(physical, modifiers) {
-            self.pending_hotkey = Some(captured);
+            self.recorder.set_combo(captured);
             self.set_status(format!("preview: {} — click Confirm", hotkey::describe_captured(captured)));
         } else {
             let mods_str = hotkey::describe_modifiers(modifiers);
@@ -79,7 +69,7 @@ impl App {
         &mut self,
         modifiers: iced::keyboard::Modifiers,
     ) -> Task<Message> {
-        self.pending_hotkey_mods = modifiers;
+        self.recorder.set_modifiers(modifiers);
         Task::none()
     }
 }

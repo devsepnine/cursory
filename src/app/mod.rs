@@ -5,7 +5,8 @@ use iced::{Subscription, Task, Theme, time, window};
 use crate::autostart;
 use crate::confine::{CageMode, ClipController, ScreenRect};
 pub use crate::domain::{CloseBehavior, Mode};
-use crate::hotkey::{self, Captured, HotkeyService};
+use crate::hotkey::{self, HotkeyService};
+use hotkey_recorder::HotkeyRecorder;
 use crate::icon::{self, IconState};
 use crate::monitor::{self, MonitorInfo};
 use crate::settings::{self, Settings};
@@ -14,6 +15,7 @@ use crate::target::{self, WindowInfo};
 use crate::tray::{TrayEvent, TrayService};
 
 mod draw;
+mod hotkey_recorder;
 mod logic;
 mod panels;
 mod settings_view;
@@ -62,9 +64,7 @@ pub struct App {
     launch_on_startup: bool,
     start_in_tray: bool,
     close_behavior: CloseBehavior,
-    recording_hotkey: bool,
-    pending_hotkey: Option<Captured>,
-    pending_hotkey_mods: iced::keyboard::Modifiers,
+    recorder: HotkeyRecorder,
     reset_pending: bool,
     drawing_rect: bool,
     rect_window_id: Option<window::Id>,
@@ -150,9 +150,7 @@ impl Default for App {
             launch_on_startup: autostart::is_enabled(),
             start_in_tray: saved.start_in_tray,
             close_behavior: saved.close_behavior,
-            recording_hotkey: false,
-            pending_hotkey: None,
-            pending_hotkey_mods: iced::keyboard::Modifiers::empty(),
+            recorder: HotkeyRecorder::default(),
             reset_pending: false,
             drawing_rect: false,
             rect_window_id: None,
@@ -188,7 +186,7 @@ impl App {
             }));
         }
         subs.push(window::close_requests().map(Message::CloseRequested));
-        if self.recording_hotkey {
+        if self.recorder.is_recording() {
             subs.push(iced::event::listen_with(
                 |event, _status, _id| match event {
                     iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
