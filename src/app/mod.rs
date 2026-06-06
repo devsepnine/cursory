@@ -3,9 +3,10 @@ use std::time::{Duration, Instant};
 use iced::{Subscription, Task, Theme, time, window};
 
 use crate::autostart;
-use crate::confine::{CageMode, ClipController, ScreenRect};
+use crate::confine::{CageMode, ClipController};
 pub use crate::domain::{CloseBehavior, Mode};
 use crate::hotkey::{self, HotkeyService};
+use custom_rect::CustomRect;
 use draw_session::DrawSession;
 use hotkey_recorder::HotkeyRecorder;
 use tray_state::TrayState;
@@ -16,6 +17,7 @@ use crate::single_instance;
 use crate::target::{self, WindowInfo};
 use crate::tray::{TrayEvent, TrayService};
 
+mod custom_rect;
 mod draw;
 mod draw_session;
 mod hotkey_recorder;
@@ -55,10 +57,7 @@ pub struct App {
     is_active: bool,
     monitors: Vec<MonitorInfo>,
     selected_monitor: usize,
-    custom_left: String,
-    custom_top: String,
-    custom_width: String,
-    custom_height: String,
+    custom: CustomRect,
     padding: String,
     window_id: Option<window::Id>,
     window_hwnd: Option<isize>,
@@ -139,10 +138,12 @@ impl Default for App {
             mode: saved.mode,
             is_active: false,
             selected_monitor,
-            custom_left: saved.custom_left.to_string(),
-            custom_top: saved.custom_top.to_string(),
-            custom_width: saved.custom_width.to_string(),
-            custom_height: saved.custom_height.to_string(),
+            custom: CustomRect::new(
+                saved.custom_left,
+                saved.custom_top,
+                saved.custom_width,
+                saved.custom_height,
+            ),
             padding: saved.padding.to_string(),
             window_id: None,
             window_hwnd: None,

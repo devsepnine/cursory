@@ -72,17 +72,11 @@ impl App {
             Field::Padding => value.trim().is_empty() || value.trim().parse::<i32>().is_ok(),
             _ => value.trim().parse::<i32>().is_ok(),
         };
-        let target = match field {
-            Field::Left => &mut self.custom_left,
-            Field::Top => &mut self.custom_top,
-            Field::Width => &mut self.custom_width,
-            Field::Height => &mut self.custom_height,
-            Field::Padding => &mut self.padding,
-        };
-        *target = value;
         if matches!(field, Field::Padding) {
+            self.padding = value;
             self.refresh_padding();
         } else {
+            self.custom.set(field, value);
             self.refresh_controller_mode();
         }
         if valid {

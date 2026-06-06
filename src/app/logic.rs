@@ -66,10 +66,10 @@ impl App {
         let settings = Settings {
             mode: self.mode,
             selected_monitor: self.selected_monitor,
-            custom_left: self.custom_left.trim().parse().unwrap_or(100),
-            custom_top: self.custom_top.trim().parse().unwrap_or(100),
-            custom_width: self.custom_width.trim().parse().unwrap_or(800),
-            custom_height: self.custom_height.trim().parse().unwrap_or(600),
+            custom_left: self.custom.value_or(Field::Left, 100),
+            custom_top: self.custom.value_or(Field::Top, 100),
+            custom_width: self.custom.value_or(Field::Width, 800),
+            custom_height: self.custom.value_or(Field::Height, 600),
             padding: self.padding.trim().parse().unwrap_or(0),
             minimize_on_activate: self.minimize_on_activate,
             start_in_tray: self.start_in_tray,
@@ -90,10 +90,12 @@ impl App {
         } else {
             d.selected_monitor.min(self.monitors.len() - 1)
         };
-        self.custom_left = d.custom_left.to_string();
-        self.custom_top = d.custom_top.to_string();
-        self.custom_width = d.custom_width.to_string();
-        self.custom_height = d.custom_height.to_string();
+        self.custom = CustomRect::new(
+            d.custom_left,
+            d.custom_top,
+            d.custom_width,
+            d.custom_height,
+        );
         self.padding = d.padding.to_string();
         self.minimize_on_activate = d.minimize_on_activate;
         self.start_in_tray = d.start_in_tray;
@@ -175,34 +177,7 @@ impl App {
                 let idx = self.selected_monitor.min(self.monitors.len() - 1);
                 Ok(CageMode::Fixed(self.monitors[idx].bounds))
             }
-            Mode::Custom => {
-                let left: i32 = self
-                    .custom_left
-                    .trim()
-                    .parse()
-                    .map_err(|_| "left not a number")?;
-                let top: i32 = self
-                    .custom_top
-                    .trim()
-                    .parse()
-                    .map_err(|_| "top not a number")?;
-                let width: i32 = self
-                    .custom_width
-                    .trim()
-                    .parse()
-                    .map_err(|_| "width not a number")?;
-                let height: i32 = self
-                    .custom_height
-                    .trim()
-                    .parse()
-                    .map_err(|_| "height not a number")?;
-                if width <= 0 || height <= 0 {
-                    return Err("width/height must be positive".into());
-                }
-                Ok(CageMode::Fixed(ScreenRect::from_xywh(
-                    left, top, width, height,
-                )))
-            }
+            Mode::Custom => self.custom.parse().map(CageMode::Fixed),
         }
     }
 

@@ -63,10 +63,7 @@ impl App {
             let top = p.y.round() as i32;
             let w = size.width.round().max(1.0) as i32;
             let h = size.height.round().max(1.0) as i32;
-            self.custom_left = left.to_string();
-            self.custom_top = top.to_string();
-            self.custom_width = w.to_string();
-            self.custom_height = h.to_string();
+            self.custom = CustomRect::new(left, top, w, h);
             self.set_status(format!("rect set: {}×{} at ({},{})", w, h, left, top));
             self.refresh_controller_mode();
             self.persist();

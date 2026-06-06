@@ -93,10 +93,10 @@ impl App {
             .align_y(iced::Alignment::Center)
         };
         column![
-            field("Left", &self.custom_left, Field::Left),
-            field("Top", &self.custom_top, Field::Top),
-            field("Width", &self.custom_width, Field::Width),
-            field("Height", &self.custom_height, Field::Height),
+            field("Left", self.custom.get(Field::Left), Field::Left),
+            field("Top", self.custom.get(Field::Top), Field::Top),
+            field("Width", self.custom.get(Field::Width), Field::Width),
+            field("Height", self.custom.get(Field::Height), Field::Height),
             wide_secondary_button("Draw on screen", Message::StartDrawRect),
         ]
         .spacing(6)
