@@ -1,5 +1,5 @@
+use std::ffi::c_void;
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::{Mutex, OnceLock};
 use std::thread::{self, JoinHandle};
 
 use crate::icon::IconState;
@@ -11,9 +11,10 @@ use windows::Win32::UI::Shell::{
     Shell_NotifyIconW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateIconFromResourceEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
-    GetMessageW, HICON, HWND_MESSAGE, IMAGE_FLAGS, MSG, PostMessageW, PostQuitMessage,
-    RegisterClassW, TranslateMessage, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_DESTROY,
+    CREATESTRUCTW, CreateIconFromResourceEx, CreateWindowExW, DefWindowProcW, DestroyWindow,
+    DispatchMessageW, GWLP_USERDATA, GetMessageW, GetWindowLongPtrW, HICON, HWND_MESSAGE,
+    IMAGE_FLAGS, MSG, PostMessageW, PostQuitMessage, RegisterClassW, SetWindowLongPtrW,
+    TranslateMessage, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_CREATE, WM_DESTROY,
     WM_LBUTTONDBLCLK, WNDCLASSW,
 };
 use windows::core::{Error, w};
@@ -24,8 +25,6 @@ const WM_TRAY_SHUTDOWN: u32 = WM_APP + 2;
 const WM_TRAY_SET_ACTIVE: u32 = WM_APP + 3;
 const IDLE_ICON: &[u8] = include_bytes!("../assets/icon.ico");
 const ACTIVE_ICON: &[u8] = include_bytes!("../assets/icon-active.ico");
-
-static TRAY_EVENTS: OnceLock<Mutex<Option<Sender<TrayEvent>>>> = OnceLock::new();
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrayEvent {
@@ -93,21 +92,22 @@ fn run_tray_window(
     event_tx: Sender<TrayEvent>,
     hwnd_tx: Sender<Option<isize>>,
 ) -> windows::core::Result<()> {
-    let events = TRAY_EVENTS.get_or_init(|| Mutex::new(None));
-    *events.lock().expect("tray event mutex poisoned") = Some(event_tx);
-
-    let hwnd = match unsafe { create_message_window() } {
+    // `event_tx` lives on this stack frame for the whole message loop. The
+    // window proc reaches it through a borrowed pointer stashed in
+    // GWLP_USERDATA (set from the CreateWindowExW lparam), so there is no shared
+    // global and no ownership handed to the window. Both run on this thread, so
+    // the borrow is single-threaded; the pointer is only ever read while this
+    // frame — and thus `event_tx` — is alive.
+    let hwnd = match unsafe { create_message_window(&event_tx) } {
         Ok(hwnd) => hwnd,
         Err(error) => {
             let _ = hwnd_tx.send(None);
-            *events.lock().expect("tray event mutex poisoned") = None;
             return Err(error);
         }
     };
 
     if let Err(error) = add_icon(hwnd) {
         let _ = hwnd_tx.send(None);
-        *events.lock().expect("tray event mutex poisoned") = None;
         unsafe {
             let _ = DestroyWindow(hwnd);
         }
@@ -124,11 +124,10 @@ fn run_tray_window(
         }
     }
 
-    *events.lock().expect("tray event mutex poisoned") = None;
     Ok(())
 }
 
-unsafe fn create_message_window() -> windows::core::Result<HWND> {
+unsafe fn create_message_window(event_tx: &Sender<TrayEvent>) -> windows::core::Result<HWND> {
     let instance = unsafe { GetModuleHandleW(None)? };
     let class_name = w!("CursoryTrayWindow");
 
@@ -155,7 +154,7 @@ unsafe fn create_message_window() -> windows::core::Result<HWND> {
             HWND_MESSAGE,
             None,
             instance,
-            None,
+            Some(event_tx as *const Sender<TrayEvent> as *const c_void),
         )
     }
 }
@@ -265,11 +264,20 @@ unsafe extern "system" fn tray_wnd_proc(
     lparam: LPARAM,
 ) -> LRESULT {
     match msg {
+        WM_CREATE => {
+            // Stash the borrowed Sender pointer (passed as the CreateWindowExW
+            // lparam) so later messages can reach it without a global.
+            let create = lparam.0 as *const CREATESTRUCTW;
+            let sender = unsafe { (*create).lpCreateParams };
+            unsafe {
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, sender as isize);
+            }
+            LRESULT(0)
+        }
         WM_TRAY_ICON if lparam.0 as u32 == WM_LBUTTONDBLCLK => {
-            if let Some(events) = TRAY_EVENTS.get() {
-                if let Some(sender) = events.lock().expect("tray event mutex poisoned").as_ref() {
-                    let _ = sender.send(TrayEvent::RestoreRequested);
-                }
+            let sender = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) } as *const Sender<TrayEvent>;
+            if !sender.is_null() {
+                let _ = unsafe { (*sender).send(TrayEvent::RestoreRequested) };
             }
             LRESULT(0)
         }
