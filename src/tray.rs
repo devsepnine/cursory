@@ -406,13 +406,13 @@ unsafe fn show_context_menu(hwnd: HWND, ctx: &TrayContext) {
     }
 }
 
-/// Show a native "About" dialog with the app name, version, and a one-line
-/// description. Built as a runtime wide string since the version is dynamic.
+/// Show a native "About" dialog with the app name, version, and author links.
+/// Built as a runtime wide string since the version is dynamic.
 unsafe fn show_about() {
     let text = format!(
         "Cursory {}\n\n\
-         Confine the mouse cursor to a window, monitor, or custom rectangle.\n\n\
-         Double-click the tray icon to restore the window.",
+         GitHub:  https://github.com/devsepnine\n\
+         X:  https://x.com/devsepnine",
         env!("CARGO_PKG_VERSION")
     );
     let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
