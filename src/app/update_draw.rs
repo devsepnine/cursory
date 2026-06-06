@@ -4,10 +4,9 @@ use super::*;
 
 impl App {
     pub(super) fn on_start_draw_rect(&mut self) -> Task<Message> {
-        if self.drawing_rect {
+        if self.draw.is_active() {
             return Task::none();
         }
-        self.drawing_rect = true;
         let settings = window::Settings {
             size: iced::Size::new(800.0, 600.0),
             position: window::Position::Centered,
@@ -18,7 +17,7 @@ impl App {
             ..Default::default()
         };
         let (rect_id, open_task) = window::open(settings);
-        self.rect_window_id = Some(rect_id);
+        self.draw.begin(rect_id);
         let mut tasks = vec![open_task.map(|_| Message::Noop)];
         if let Some(main_id) = self.window_id {
             tasks.push(window::set_mode::<Message>(main_id, window::Mode::Hidden));
@@ -27,7 +26,7 @@ impl App {
     }
 
     pub(super) fn on_confirm_rect(&mut self) -> Task<Message> {
-        if let Some(rect_id) = self.rect_window_id {
+        if let Some(rect_id) = self.draw.window_id() {
             return window::position(rect_id).then(move |pos| {
                 window::size(rect_id).map(move |size| Message::RectGeometryFetched { pos, size })
             });
@@ -41,14 +40,14 @@ impl App {
     }
 
     pub(super) fn on_rect_window_drag(&mut self) -> Task<Message> {
-        if let Some(id) = self.rect_window_id {
+        if let Some(id) = self.draw.window_id() {
             return window::drag::<Message>(id);
         }
         Task::none()
     }
 
     pub(super) fn on_rect_window_resize(&mut self, dir: window::Direction) -> Task<Message> {
-        if let Some(id) = self.rect_window_id {
+        if let Some(id) = self.draw.window_id() {
             return window::drag_resize::<Message>(id, dir);
         }
         Task::none()

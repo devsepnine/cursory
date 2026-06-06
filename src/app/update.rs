@@ -216,7 +216,7 @@ impl App {
     }
 
     fn on_close_requested(&mut self, id: window::Id) -> Task<Message> {
-        if Some(id) == self.rect_window_id {
+        if Some(id) == self.draw.window_id() {
             self.set_status("draw cancelled");
             return self.exit_draw_mode();
         }

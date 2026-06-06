@@ -207,8 +207,7 @@ impl App {
     }
 
     pub(super) fn exit_draw_mode(&mut self) -> Task<Message> {
-        self.drawing_rect = false;
-        let rect_id = self.rect_window_id.take();
+        let rect_id = self.draw.end();
         let main_id = self.window_id;
         let mut tasks: Vec<Task<Message>> = Vec::new();
         if let Some(rid) = rect_id {

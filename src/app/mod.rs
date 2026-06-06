@@ -6,6 +6,7 @@ use crate::autostart;
 use crate::confine::{CageMode, ClipController, ScreenRect};
 pub use crate::domain::{CloseBehavior, Mode};
 use crate::hotkey::{self, HotkeyService};
+use draw_session::DrawSession;
 use hotkey_recorder::HotkeyRecorder;
 use crate::icon::{self, IconState};
 use crate::monitor::{self, MonitorInfo};
@@ -15,6 +16,7 @@ use crate::target::{self, WindowInfo};
 use crate::tray::{TrayEvent, TrayService};
 
 mod draw;
+mod draw_session;
 mod hotkey_recorder;
 mod logic;
 mod panels;
@@ -66,8 +68,7 @@ pub struct App {
     close_behavior: CloseBehavior,
     recorder: HotkeyRecorder,
     reset_pending: bool,
-    drawing_rect: bool,
-    rect_window_id: Option<window::Id>,
+    draw: DrawSession,
     hidden_to_tray: bool,
     checking_minimized: bool,
     hotkey: Option<HotkeyService>,
@@ -152,8 +153,7 @@ impl Default for App {
             close_behavior: saved.close_behavior,
             recorder: HotkeyRecorder::default(),
             reset_pending: false,
-            drawing_rect: false,
-            rect_window_id: None,
+            draw: DrawSession::default(),
             hidden_to_tray: false,
             checking_minimized: false,
             hotkey,
@@ -201,7 +201,7 @@ impl App {
                 },
             ));
         }
-        if self.drawing_rect {
+        if self.draw.is_active() {
             subs.push(iced::event::listen_with(
                 |event, _status, _id| match event {
                     iced::Event::Keyboard(iced::keyboard::Event::KeyPressed { key, .. }) => {

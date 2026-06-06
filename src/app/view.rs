@@ -8,7 +8,7 @@ use super::{App, Message, Mode};
 
 impl App {
     pub fn view(&self) -> Element<'_, Message> {
-        if self.drawing_rect {
+        if self.draw.is_active() {
             return super::draw::view();
         }
         let titlebar = self.titlebar();
