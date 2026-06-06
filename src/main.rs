@@ -2,6 +2,7 @@
 
 mod app;
 mod autostart;
+mod browser;
 mod confine;
 mod domain;
 mod hotkey;
@@ -27,7 +28,10 @@ fn main() -> iced::Result {
         }
     };
 
-    iced::application(App::default, App::update, App::view)
+    // A daemon (rather than a single-window application) so the About window can
+    // be a real second window with its own content. The main window is opened by
+    // `App::boot`; the app exits via `iced::exit()` (see `App::exit_app`).
+    iced::daemon(App::boot, App::update, App::view)
         .title(App::title)
         .theme(App::theme)
         .subscription(App::subscription)
@@ -35,11 +39,6 @@ fn main() -> iced::Result {
             background_color: iced::Color::TRANSPARENT,
             text_color: theme.extended_palette().background.base.text,
         })
-        .window_size((460.0, 880.0))
-        .resizable(false)
-        .decorations(false)
-        .transparent(true)
-        .exit_on_close_request(false)
         .default_font(iced::Font::with_name("Malgun Gothic"))
         .run()
 }

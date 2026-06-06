@@ -39,6 +39,11 @@ impl App {
                 self.on_minimize_state_checked(is_minimized)
             }
             Message::ResetSettings => self.on_reset_settings(),
+            Message::CloseAbout => self.close_about(),
+            Message::OpenUrl(url) => {
+                crate::browser::open(url);
+                Task::none()
+            }
             Message::Noop => Task::none(),
         }
     }
@@ -112,6 +117,7 @@ impl App {
                 return match event {
                     TrayEvent::Restore => self.restore_from_tray(),
                     TrayEvent::Toggle => self.toggle(),
+                    TrayEvent::About => self.open_about(),
                     TrayEvent::Exit => self.exit_app(),
                 };
             }
@@ -217,6 +223,9 @@ impl App {
         if Some(id) == self.draw.window_id() {
             self.set_status("draw cancelled");
             return self.exit_draw_mode();
+        }
+        if Some(id) == self.about_window_id {
+            return self.close_about();
         }
         if Some(id) == self.window_id {
             return self.close_app();

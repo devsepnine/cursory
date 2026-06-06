@@ -17,6 +17,7 @@ use crate::single_instance;
 use crate::target::{self, WindowInfo};
 use crate::tray::{TrayEvent, TrayService};
 
+mod about;
 mod custom_rect;
 mod draw;
 mod draw_session;
@@ -70,6 +71,7 @@ pub struct App {
     recorder: HotkeyRecorder,
     reset_pending: bool,
     draw: DrawSession,
+    about_window_id: Option<window::Id>,
     tray_state: TrayState,
     hotkey: Option<HotkeyService>,
     tray: Option<TrayService>,
@@ -116,6 +118,8 @@ pub enum Message {
     },
     MinimizeStateChecked(Option<bool>),
     ResetSettings,
+    CloseAbout,
+    OpenUrl(&'static str),
     Noop,
 }
 
@@ -156,6 +160,7 @@ impl Default for App {
             recorder: HotkeyRecorder::default(),
             reset_pending: false,
             draw: DrawSession::default(),
+            about_window_id: None,
             tray_state: TrayState::default(),
             hotkey,
             tray,
@@ -167,25 +172,41 @@ impl Default for App {
     }
 }
 
+fn main_window_settings() -> window::Settings {
+    window::Settings {
+        size: iced::Size::new(460.0, 880.0),
+        resizable: false,
+        decorations: false,
+        transparent: true,
+        exit_on_close_request: false,
+        ..Default::default()
+    }
+}
+
 impl App {
-    pub fn title(&self) -> String {
+    /// Daemon boot: build state and open the main window. The window id flows
+    /// back through `WindowOpened`, where HWND capture and the icon are wired up.
+    pub fn boot() -> (Self, Task<Message>) {
+        let app = Self::default();
+        let (_id, open) = window::open(main_window_settings());
+        (app, open.map(Message::WindowOpened))
+    }
+
+    pub fn title(&self, window: window::Id) -> String {
+        if Some(window) == self.about_window_id {
+            return "About Cursory".to_string();
+        }
         let suffix = if self.is_active { "active" } else { "idle" };
         format!("Cursory — {suffix}")
     }
 
-    pub fn theme(&self) -> Theme {
+    pub fn theme(&self, _window: window::Id) -> Theme {
         Theme::TokyoNightStorm
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
         let tick = time::every(Duration::from_millis(50)).map(|_| Message::Tick);
         let mut subs: Vec<Subscription<Message>> = vec![tick];
-        if self.window_hwnd.is_none() {
-            subs.push(iced::window::events().map(|(id, event)| match event {
-                iced::window::Event::Opened { .. } => Message::WindowOpened(id),
-                _ => Message::Noop,
-            }));
-        }
         subs.push(window::close_requests().map(Message::CloseRequested));
         if self.recorder.is_recording() {
             subs.push(iced::event::listen_with(

@@ -5,26 +5,21 @@ use std::thread::{self, JoinHandle};
 
 use crate::icon::IconState;
 
-use windows::Win32::Foundation::{BOOL, HWND, LPARAM, LRESULT, POINT, S_OK, WPARAM};
+use windows::Win32::Foundation::{BOOL, HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::Controls::{
-    TASKDIALOG_NOTIFICATIONS, TASKDIALOGCONFIG, TASKDIALOGCONFIG_0, TaskDialogIndirect,
-    TD_INFORMATION_ICON, TDCBF_OK_BUTTON, TDF_ENABLE_HYPERLINKS, TDN_HYPERLINK_CLICKED,
-};
 use windows::Win32::UI::Shell::{
     NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NIM_MODIFY, NOTIFYICONDATAW,
-    Shell_NotifyIconW, ShellExecuteW,
+    Shell_NotifyIconW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CREATESTRUCTW, CreateIconFromResourceEx, CreatePopupMenu, CreateWindowExW,
     DefWindowProcW, DestroyMenu, DestroyWindow, DispatchMessageW, GWLP_USERDATA, GetCursorPos,
     GetMessageW, GetWindowLongPtrW, HICON, HWND_MESSAGE, IMAGE_FLAGS, MF_SEPARATOR, MF_STRING, MSG,
-    PostMessageW, PostQuitMessage, RegisterClassW, SW_SHOWNORMAL, SetForegroundWindow,
-    SetWindowLongPtrW, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage,
-    WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_CREATE, WM_DESTROY, WM_LBUTTONDBLCLK, WM_NULL,
-    WM_RBUTTONUP, WNDCLASSW,
+    PostMessageW, PostQuitMessage, RegisterClassW, SetForegroundWindow, SetWindowLongPtrW,
+    TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WINDOW_EX_STYLE,
+    WINDOW_STYLE, WM_APP, WM_CREATE, WM_DESTROY, WM_LBUTTONDBLCLK, WM_NULL, WM_RBUTTONUP, WNDCLASSW,
 };
-use windows::core::{Error, HRESULT, PCWSTR, w};
+use windows::core::{Error, PCWSTR, w};
 
 const TRAY_UID: u32 = 1;
 const WM_TRAY_ICON: u32 = WM_APP + 1;
@@ -43,6 +38,7 @@ const CMD_EXIT: u32 = 4;
 pub enum TrayEvent {
     Restore,
     Toggle,
+    About,
     Exit,
 }
 
@@ -396,69 +392,11 @@ unsafe fn show_context_menu(hwnd: HWND, ctx: &TrayContext) {
     let event = match command.0 as u32 {
         CMD_SHOW => Some(TrayEvent::Restore),
         CMD_TOGGLE => Some(TrayEvent::Toggle),
+        CMD_ABOUT => Some(TrayEvent::About),
         CMD_EXIT => Some(TrayEvent::Exit),
-        // "About" is shown directly on the tray thread; the cursor cage runs on
-        // its own thread, so the modal box does not stall confinement.
-        CMD_ABOUT => {
-            unsafe { show_about() };
-            None
-        }
         _ => None,
     };
     if let Some(event) = event {
         let _ = ctx.sender.send(event);
     }
-}
-
-/// Show a native "About" task dialog: app name + version as the heading and two
-/// clickable hyperlinks (github / x). The version heading is built at runtime
-/// (dynamic), so it is a NUL-terminated wide buffer kept alive across the call.
-unsafe fn show_about() {
-    let heading = format!("Cursory {}", env!("CARGO_PKG_VERSION"));
-    let heading: Vec<u16> = heading.encode_utf16().chain(std::iter::once(0)).collect();
-
-    let config = TASKDIALOGCONFIG {
-        cbSize: std::mem::size_of::<TASKDIALOGCONFIG>() as u32,
-        dwFlags: TDF_ENABLE_HYPERLINKS,
-        dwCommonButtons: TDCBF_OK_BUTTON,
-        pszWindowTitle: w!("About Cursory"),
-        Anonymous1: TASKDIALOGCONFIG_0 {
-            pszMainIcon: TD_INFORMATION_ICON,
-        },
-        pszMainInstruction: PCWSTR(heading.as_ptr()),
-        pszContent: w!(
-            "<a href=\"https://github.com/devsepnine\">github</a>          \
-             <a href=\"https://x.com/devsepnine\">x</a>"
-        ),
-        pfCallback: Some(about_callback),
-        ..Default::default()
-    };
-
-    unsafe {
-        let _ = TaskDialogIndirect(&config, None, None, None);
-    }
-}
-
-/// Task-dialog callback: open a clicked hyperlink in the default browser.
-unsafe extern "system" fn about_callback(
-    _hwnd: HWND,
-    msg: TASKDIALOG_NOTIFICATIONS,
-    _wparam: WPARAM,
-    lparam: LPARAM,
-    _data: isize,
-) -> HRESULT {
-    if msg == TDN_HYPERLINK_CLICKED {
-        let url = PCWSTR(lparam.0 as *const u16);
-        unsafe {
-            ShellExecuteW(
-                None,
-                w!("open"),
-                url,
-                PCWSTR::null(),
-                PCWSTR::null(),
-                SW_SHOWNORMAL,
-            );
-        }
-    }
-    S_OK
 }

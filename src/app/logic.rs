@@ -236,13 +236,40 @@ impl App {
         }
     }
 
-    /// Quit the app unconditionally (the tray "Exit" command). Closing the main
-    /// window ends the iced runtime regardless of `close_behavior`.
+    /// Quit the app unconditionally (the tray "Exit" command). A daemon keeps
+    /// running once its windows close, so termination must go through
+    /// `iced::exit()` rather than closing the main window.
     pub(super) fn exit_app(&mut self) -> Task<Message> {
-        if let Some(id) = self.window_id {
-            window::close::<Message>(id)
-        } else {
-            Task::none()
+        iced::exit()
+    }
+
+    /// Open the About window (or focus it if already open).
+    pub(super) fn open_about(&mut self) -> Task<Message> {
+        if let Some(id) = self.about_window_id {
+            return window::gain_focus::<Message>(id);
+        }
+        let settings = window::Settings {
+            size: iced::Size::new(320.0, 240.0),
+            position: window::Position::Centered,
+            resizable: false,
+            decorations: false,
+            transparent: true,
+            level: window::Level::AlwaysOnTop,
+            // Our CloseRequested handler is the sole closer, so the about id is
+            // always cleared on close (no stale id from an auto-close).
+            exit_on_close_request: false,
+            ..Default::default()
+        };
+        let (id, open_task) = window::open(settings);
+        self.about_window_id = Some(id);
+        open_task.map(|_| Message::Noop)
+    }
+
+    /// Close the About window if it is open.
+    pub(super) fn close_about(&mut self) -> Task<Message> {
+        match self.about_window_id.take() {
+            Some(id) => window::close::<Message>(id),
+            None => Task::none(),
         }
     }
 
