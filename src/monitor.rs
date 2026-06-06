@@ -8,11 +8,7 @@ const MONITORINFOF_PRIMARY: u32 = 0x0000_0001;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MonitorInfo {
-    #[allow(dead_code)]
-    pub name: String,
     pub bounds: ScreenRect,
-    #[allow(dead_code)]
-    pub work_area: ScreenRect,
     pub is_primary: bool,
 }
 
@@ -44,19 +40,8 @@ unsafe extern "system" fn enum_proc(
         return BOOL(1);
     }
     let bounds = info.monitorInfo.rcMonitor;
-    let work = info.monitorInfo.rcWork;
-    let name = String::from_utf16_lossy(
-        &info
-            .szDevice
-            .iter()
-            .copied()
-            .take_while(|c| *c != 0)
-            .collect::<Vec<u16>>(),
-    );
     monitors.push(MonitorInfo {
-        name,
         bounds: ScreenRect::new(bounds.left, bounds.top, bounds.right, bounds.bottom),
-        work_area: ScreenRect::new(work.left, work.top, work.right, work.bottom),
         is_primary: (info.monitorInfo.dwFlags & MONITORINFOF_PRIMARY) != 0,
     });
     BOOL(1)
