@@ -9,7 +9,7 @@ use super::{App, Message, Mode};
 impl App {
     pub fn view(&self, window_id: iced::window::Id) -> Element<'_, Message> {
         if Some(window_id) == self.about_window_id {
-            return super::about::view();
+            return super::about::view(self.about_icon.clone());
         }
         if Some(window_id) == self.draw.window_id() {
             return super::draw::view();

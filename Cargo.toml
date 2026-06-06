@@ -8,7 +8,7 @@ authors = ["HibiCanvas"]
 license = "MIT"
 
 [dependencies]
-iced = { version = "0.14", default-features = false, features = ["tokio", "advanced", "canvas", "wgpu"] }
+iced = { version = "0.14", default-features = false, features = ["tokio", "advanced", "canvas", "wgpu", "image", "svg"] }
 global-hotkey = "0.6"
 thiserror = "2"
 

@@ -1,5 +1,6 @@
 use std::time::{Duration, Instant};
 
+use iced::widget::image;
 use iced::{Subscription, Task, Theme, time, window};
 
 use crate::autostart;
@@ -72,6 +73,7 @@ pub struct App {
     reset_pending: bool,
     draw: DrawSession,
     about_window_id: Option<window::Id>,
+    about_icon: image::Handle,
     tray_state: TrayState,
     hotkey: Option<HotkeyService>,
     tray: Option<TrayService>,
@@ -161,6 +163,7 @@ impl Default for App {
             reset_pending: false,
             draw: DrawSession::default(),
             about_window_id: None,
+            about_icon: image::Handle::from_rgba(64, 64, icon::icon_rgba(64, IconState::Idle)),
             tray_state: TrayState::default(),
             hotkey,
             tray,
